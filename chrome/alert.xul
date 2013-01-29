@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://global/content/commonDialog.css" type="text/css"?>
+<?xml-stylesheet href="chrome://global/skin/commonDialog.css" type="text/css"?>
+<!DOCTYPE dialog SYSTEM "chrome://global/locale/commonDialog.dtd">
+<dialog
+	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+	aria-describedby="body"
+	id="iMegaAlert"
+	onload="onLoad()"
+	onbeforeunload="onUnload()"
+	ondialogaccept="return onUnload(1);"
+	title="Please Confirm Operation - iMEGA"
+	buttonpack="center">
+	
+	<script type="text/javascript">
+	<![CDATA[
+		let {classes:Cc,interfaces:Ci,utils:Cu,results:Cr} = Components;
+		Cu.import("resource://gre/modules/Services.jsm");
+		let args, iObs = {
+			waiting: [],
+			QueryInterface: function(x) {
+				if(x.equals(Ci.nsIObserver)
+				|| x.equals(Ci.nsIFactory)
+				|| x.equals(Ci.nsISupportsWeakReference)
+				|| x.equals(Ci.nsISupports)) {
+					return this;
+				}
+				throw Cr.NS_NOINTERFACE;
+			},
+			observe: function(s,t,d) {
+				if(/^imegaa-/.test(t)) {
+					switch(t) {
+						case 'imegaa-login-result':
+							if((document.getElementById('login_message').value = '' + d) == 'Logged.') {
+								window.setTimeout(window.close.bind(window), 800);
+							} else {
+								document.documentElement.getButton("accept").disabled = false;
+								document.getElementById('login_password').value = '';
+							}
+							break;
+					}
+					Services.obs.removeObserver(this, t);
+				}
+			}
+		};
+		function onUnload(g) {
+			let result = {status:!!g};
+			
+			if(g && args[0] == 1) {
+				document.documentElement.getButton("accept").disabled = true;
+				document.getElementById('login_message').value = 'Please wait...';
+				window.sizeToContent();
+				result.u = document.getElementById('login_email').value;
+				result.p = document.getElementById('login_password').value;
+				Services.obs.addObserver(iObs, result.tob = 'imegaa-login-result', true);
+				iObs.waiting.push(result.tob);
+			}
+			
+			if(g) {
+				window.setTimeout(function(){ args[2](result); }, 400);
+				return false;
+			}
+			
+			args[2](result);
+			
+			while(g = iObs.waiting.pop()) try {
+				Services.obs.removeObserver(iObs, g);
+			} catch(e) {}
+			
+			iObs = args = undefined;
+			return true;
+		}
+		function onLoad() {
+			args = window.arguments;
+			
+			switch(document.getElementById('deck').selectedIndex = args[0] - 1) {
+				default:
+					document.getElementById('message').appendChild(document.createTextNode(args[1]));
+					break;
+			}
+			
+			document.getElementById('body').setAttribute('style','margin:12px 9px;padding:13px;'
+				+ 'border:1px solid rgba(20,20,30,0.4);box-shadow:inset 0 0 3px 0 rgba(0,0,0,0.6);'
+				+ 'border-radius:7px;background-color:#e4e4e2');
+			
+			document.documentElement.style.setProperty('padding','0 0 7px 0','important');
+			// document.documentElement.style.setProperty('background-color','#D11E00','important');
+			document.documentElement.style.setProperty('font','16px Helvetica','important');
+			
+			window.sizeToContent();
+			window.getAttention();
+			window.focus();
+			
+			[].forEach.call(document.querySelectorAll('textbox'),function(n){
+				n.setAttribute('style','font-weight:bold;box-shadow:0 0 3px #9f9e9f;border-radius:7px;');
+			});
+		}
+	]]>
+	</script>
+	
+	<hbox id="filler" style="min-width: 0%;">
+		<spacer style="width: 29em;"/>
+	</hbox>
+	<vbox pack="center">
+		<hbox flex="1">
+			<image src="https://eu.static.mega.co.nz/images/mega/logo.png" height="50" />
+		</hbox>
+		<hbox id="body" flex="1">
+			<deck id="deck" flex="1">
+				<vbox>
+					<groupbox>
+						<caption label=" Enter Login Details "/>
+						<grid>
+							<columns>
+								<column flex="1"/>
+								<column flex="100"/>
+							</columns>
+							<rows>
+								<row align="baseline">
+									<label value="Your Email:" />
+									<textbox flex="1" id="login_email" />
+								</row>
+								<row align="baseline">
+									<label value="Password:" />
+									<textbox flex="1" id="login_password" type="password" />
+								</row>
+							</rows>
+						</grid>
+					</groupbox>
+					<description id="login_message" flex="1" style="color:red" />
+				</vbox>
+				<description id="message" flex="1"/>
+			</deck>
+		</hbox>
+	</vbox>
+</dialog>
