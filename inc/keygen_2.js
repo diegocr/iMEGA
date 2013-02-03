@@ -290,12 +290,12 @@ function mpp1() // returns a Maurer Provable Prime, see HAC chap 4 (c) CRC press
 {
  var bits = getargs();
 
-console.log("Getting " + bits + " prime bits at depth " + depth);
+ if (d) console.log("Getting " + bits + " prime bits at depth " + depth);
  if(bits < 10) ret([Primes[rand(Primes.length)]]);
  else if(bits <=20) ret([nextPrime(rand(1<<bits))]);
  else
  {
-depth++;
+ depth++;
 
  var r;
 
@@ -360,9 +360,9 @@ function mpp3()
     d=bgcd(b,n);
     if(beq(d,[1]))
 	{
-depth--;
+		depth--;
 		setprogress(0,45*cbits/bits);
-		console.log("rc=" + rc);
+		if (d) console.log("rc=" + rc);
 		ret(n);
 	}
    }
@@ -493,7 +493,7 @@ function keygenexec()
 			case 0:
 				setprogress(1,0);
 				maxsp = 0;
-				console.log("mpp1");
+				if (d) console.log("mpp1");
 				push(10,1,bits);
 				break;
 
@@ -501,13 +501,13 @@ function keygenexec()
 				setprogress(1,45);
 				maxsp = 0;
 				rsa_q=retval;
-				console.log("mpp2");
+				if (d) console.log("mpp2");
 				push(10,2,bits);
 				break;
 				
 			case 2:
 				 rsa_p=retval;
-				 console.log("bmul");
+				 if (d) console.log("bmul");
 				 p1q1=bmul(bsub(rsa_p,[1]),bsub(rsa_q,[1]));
 				 
 				 c = 5;
@@ -567,7 +567,6 @@ function keygenexec()
 		currtime = new Date().getTime();
 		loops++;
 	} while (currtime-lasttime < 20);
-//console.log("lasttime=" + lasttime + " loops=" + loops);
 
 	lasttime = currtime;
 	setTimeout(keygenexec,0);
@@ -589,7 +588,7 @@ function keycomplete()
 {
 	var endTime=new Date();
 	
-	console.log("Key generation took " +  (endTime.getTime()-startTime.getTime())/1000.0) + " seconds!";
+	if (d) console.log("Key generation took " +  (endTime.getTime()-startTime.getTime())/1000.0) + " seconds!";
 
 	api_setrsa([rsa_p,rsa_q,rsa_d,rsa_u],[rsa_pq,rsa_e]);
 }

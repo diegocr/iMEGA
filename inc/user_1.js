@@ -1,7 +1,7 @@
 if (typeof localStorage == 'undefined')
 {
 	console.log('Web storage NOT supported');
-	// redirect to browser upgrade page
+	// TODO: redirect to browser upgrade page
 }
 
 var u_storage;
@@ -98,7 +98,6 @@ function u_checklogin2a(ctx,ks)
 function u_checklogin3(ctx)
 {
 	ctx.callback = u_checklogin3a;
-
 	api_getuser(ctx);
 }
 	
@@ -106,7 +105,11 @@ function u_checklogin3a(res,ctx)
 {
 	var r = false;
 
-	if (typeof res != 'object' || typeof res[0] != 'object') u_logout();
+	if (typeof res != 'object' || typeof res[0] != 'object')
+	{
+		u_logout();
+		r = res;
+	}
 	else
 	{
 		u_attr = res[0];
@@ -170,6 +173,34 @@ function createanonuser2(up,ctx)
 	if (up === false || !(localStorage.p = ctx.passwordkey) || !(localStorage.handle = up[0])) up = false;
 
 	ctx.createanonuserresult(ctx,up);
+}
+
+function setpwreq(newpw,ctx)
+{
+	var pw_aes = new sjcl.cipher.aes(prepare_key_pw(newpw));
+	
+	api_req([{ a : 'upkm',
+		k : a32_to_base64(encrypt_key(pw_aes,u_k)),
+		uh : stringhash(u_attr['email'].toLowerCase(),pw_aes)
+	}],ctx);
+}
+
+function setpwset(confstring,ctx)
+{
+	api_req([{ a : 'up',
+		uk : confstring
+	}],ctx);
+}
+
+function changepw(currentpw,newpw,ctx)
+{
+	var pw_aes = new sjcl.cipher.aes(prepare_key_pw(newpw));
+
+	api_req([{ a : 'up',
+		currk : a32_to_base64(encrypt_key(new sjcl.cipher.aes(prepare_key_pw(currentpw)),u_k)),
+		k : a32_to_base64(encrypt_key(pw_aes,u_k)),
+		uh : stringhash(u_attr['email'].toLowerCase(),pw_aes)
+	}],ctx);
 }
 
 // an anonymous account must be present - check / create before calling

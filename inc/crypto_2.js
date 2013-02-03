@@ -196,9 +196,6 @@ function base64urldecode(data)
   return dec;
 }
 
-
-
-
 // substitute standard base64 special characters to prevent JSON escaping, remove padding
 function base64urlencode(data)
 {
@@ -833,13 +830,13 @@ function api_proc()
 	apixhr = getxhr();
 	
 
-	apixhr.onerror = function(oEvent)
+	apixhr.onerror = function()
 	{
 		if (d) console.log("API request error - retrying");
 		api_result(-3);
 	}
 
-	apixhr.onload = function(oEvent)
+	apixhr.onload = function()
 	{		
 		var t;
 		
@@ -918,19 +915,17 @@ function waitsc()
 
 	if (!waitxhr) waitxhr = getxhr();
 
-	waitxhr.onerror = function(oEvent)
+	waitxhr.onerror = function()
 	{
 		if (d) console.log("Error while waiting - retrying, backoff: " + waitbackoff);
 		getsc();
 	}
 
-	waitxhr.onload = function(oEvent)
+	waitxhr.onload = function()
 	{
 		var t = new Date().getTime()-waitbegin;
-
 		if (t < 1000) waitbackoff += waitbackoff;
 		else waitbackoff = 125;
-
 		getsc();
 	}
 
@@ -1134,7 +1129,6 @@ function api_updateuser(ctx,newuser)
 
 var u_pubkeys = new Object;
 
-// @@@ remove
 // Encrypt data to a user's public key
 // Returns false in case no public key is available
 function api_cachepubkey(ctx,user)
@@ -1196,9 +1190,8 @@ function encryptto(user,data)
 	return false;
 }
 
-// @@@ replace with actual data structure
-var u_sharekeys = new Object;
-var u_nodekeys = new Object;
+var u_sharekeys = {};
+var u_nodekeys = {};
 
 // u_nodekeys must be set for all sharenodes
 // Add/cancel share(s) to a set of users or email addresses
@@ -1313,16 +1306,15 @@ function api_setshare2(res,node)
 
 function api_setrsa(privk,pubk)
 {
-	var t;
+	var t, i;
 	
 	for (t = '', i = 0; i < privk.length; i++) t = t+b2mpi(privk[i]);
 	
-	// pad @@@ use random chars
-	t = t + "---------------------------------".substr(0,(-t.length)&15);
+	for (i = (-t.length)&15; i--; ) t = t + String.fromCharCode(rand(256));
 
 	ctx = { callback : function(res,ctx)
 		{
-			console.log("RSA key put result=" + res);
+			if (d) console.log("RSA key put result=" + res);
 			
 			u_privk = ctx.privk;
 			u_storage.privk = JSON.stringify(u_privk);
@@ -1437,7 +1429,7 @@ function api_completeupload2(ctx,ut)
 	}
 }
 
-// Generate crypto request response for the given nodes/shares matrix
+// generate crypto request response for the given nodes/shares matrix
 function crypto_makecr(source,shares,source_is_nodes)
 {
 	var i, j, n;
@@ -1447,7 +1439,7 @@ function crypto_makecr(source,shares,source_is_nodes)
 	// if we have node handles, include in cr - otherwise, we have node keys
 	if (source_is_nodes) cr[1] = source;
 
-	// @@@ optimization: keep track of pre-existing/sent keys, only send new ones
+	// TODO: optimize - keep track of pre-existing/sent keys, only send new ones
 	for (i = shares.length; i--; )
 	{
 		if (u_sharekeys[shares[i]])
@@ -1463,12 +1455,11 @@ function crypto_makecr(source,shares,source_is_nodes)
 			}
 		}
 	}
-
 	return cr;
 }
 
 // RSA-encrypt sharekey to newly RSA-equipped user
-// @@@ check source/ownership of sharekeys, prevent forged requests
+// TODO: check source/ownership of sharekeys, prevent forged requests
 function crypto_procsr(sr)
 {
 	var ctx = new Object;
@@ -1477,57 +1468,53 @@ function crypto_procsr(sr)
 
 	ctx.callback = function(res,ctx)
 	{
-		var pubkey;
-
-		if (typeof res == 'object' && typeof res[0] == 'object' && typeof res[0].pubk == 'string') u_pubkeys[ctx.sr[ctx.i+1]] = crypto_decodepubkey(res[0].pubk);
-
-		// collect all required pubkeys	
-		while (ctx.i < ctx.sr.length-2)
+		if (ctx.sr)
 		{
-			ctx.i += 2;
-			
-			if (ctx.sr[ctx.i+1].length == 11 && !(pubkey = u_pubkeys[ctx.sr[ctx.i+1]]))
+			var pubkey;
+
+			if (typeof res == 'object' && typeof res[0] == 'object' && typeof res[0].pubk == 'string') u_pubkeys[ctx.sr[ctx.i+1]] = crypto_decodepubkey(res[0].pubk);
+
+			// collect all required pubkeys	
+			while (ctx.i < ctx.sr.length-2)
 			{
-				api_req([{ a : 'uk', u : ctx.sr[ctx.i+1] }],ctx);
-				return;
-			}
-		}
+				ctx.i += 2;
 
-		var rsr = [];
-		var sh;
-		var n;
-
-		for (var i = 0; i < ctx.sr.length; i += 2)
-		{
-			sh = ctx.sr[i];
-
-			if (sh.length == 8)
-			{
-				// @@@ check auth
-				if (u_sharekeys[sh])
+				if (ctx.sr[ctx.i+1].length == 11 && !(pubkey = u_pubkeys[ctx.sr[ctx.i+1]]))
 				{
-					if (d) console.log("Encrypting sharekey " + sh + " to user " + ctx.sr[i+1]);
-
-					if (pubkey = u_pubkeys[ctx.sr[i+1]])
-					{
-						// pubkey found: encrypt share key to it
-						if (n = crypto_rsaencrypt(pubkey,a32_to_str(u_sharekeys[sh]))) rsr.push(sh,ctx.sr[i+1],base64urlencode(n));
-					}
+					api_req([{ a : 'uk', u : ctx.sr[ctx.i+1] }],ctx);
+					return;
 				}
 			}
 
-			if (rsr.length) api_req([{ a : 'k', sr : rsr }]);
+			var rsr = [];
+			var sh;
+			var n;
+
+			for (var i = 0; i < ctx.sr.length; i += 2)
+			{
+				sh = ctx.sr[i];
+
+				if (sh.length == 8)
+				{
+					// @@@ check auth
+					if (u_sharekeys[sh])
+					{
+						if (d) console.log("Encrypting sharekey " + sh + " to user " + ctx.sr[i+1]);
+
+						if (pubkey = u_pubkeys[ctx.sr[i+1]])
+						{
+							// pubkey found: encrypt share key to it
+							if (n = crypto_rsaencrypt(pubkey,a32_to_str(u_sharekeys[sh]))) rsr.push(sh,ctx.sr[i+1],base64urlencode(n));
+						}
+					}
+				}
+
+				if (rsr.length) api_req([{ a : 'k', sr : rsr }]);
+			}
 		}
 	}
 	
 	ctx.callback(false,ctx);
-}
-
-function api_confirmuser(confirmcode)
-{
-	
-
-
 }
 
 var keycache = new Object;
@@ -1584,13 +1571,12 @@ function crypto_processkey(me,master_aes,file)
 		if (key.length < 46)
 		{
 			// short keys: AES
-
 			k = base64_to_a32(key);
 
 			// check for permitted key lengths (4 == folder, 8 == file)
 			if (k.length == 4 || k.length == 8)
 			{
-				// @@@ cache sharekeys aes
+				// TODO: cache sharekeys in aes
 				k = decrypt_key(id == me ? master_aes : new sjcl.cipher.aes(u_sharekeys[id]),k);
 			}
 			else
