@@ -1,28 +1,20 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Version: MIT/X11 License
+ * Version: GPL License
  * 
- * Copyright (c) 2013 Diego Casorran
+ * Copyright (C) 2013 Diego Casorran <dcasorran@gmail.com>
  * 
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  * 
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- * 
- * Contributor(s):
- *   Diego Casorran <dcasorran@gmail.com> (Original Author)
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  * 
  * ***** END LICENSE BLOCK ***** */
 
@@ -59,76 +51,6 @@ let apipath = 'https://eu.api.mega.co.nz/';
 
 let i$ = {
 	get Window() Services.wm.getMostRecentWindow('navigator:browser'),
-	
-	cl: function(window) {
-		window.getBrowser().addEventListener('DOMContentLoaded',window['$'+addon.id.replace(/[^\d]/g,'')] = (function(ev) {
-			let doc = ev.originalTarget;
-			
-			if(!(doc.location && doc.location.host == 'mega.co.nz'))
-				return;
-			
-			let win = doc.defaultView;
-			
-			LOG('DOMContentLoaded: ' + win.location.href);
-			
-			try {
-				// let sandbox = Cu.Sandbox(win, { sandboxPrototype: win });
-				// sandbox.unsafeWindow = win.wrappedJSObject;
-				// Services.scriptloader.loadSubScript(rsc('inc/idb.filesystem.js'),sandbox);
-				Services.scriptloader.loadSubScript(rsc('inc/idb.filesystem.js'),win);
-				LOG('FileSystem API Injected...');
-			} catch(ex) {
-				LOG('FileSystem API: ' + ex);
-			}
-			
-			try {
-				let fmconfig = JSON.parse(win.localStorage.fmconfig || '{}');
-				fmconfig.blockchromeDialog = '1';
-				win.localStorage.fmconfig = JSON.stringify(fmconfig);
-			} catch(e) {
-				LOG('fmconfig: ' + e);
-			}
-			
-			let x = doc.getElementById('dllink');
-			if( x ) {
-				x.addEventListener('click', function(ev) {
-					// this.removeEventListener(ev.type, arguments.callee, true);
-					ev.preventDefault();
-					ev.stopPropagation();
-					let fn = this.download || (''+(doc.getElementById('download_filename2')
-						|| doc.getElementById('download_filename') || {}).textContent)
-						.replace(/\s*\([\d\.]+\s\w{2}\)\s*$/,'').trim();
-					i$.ir(i$.dl.bind(i$,base64urldecode(this.href.split(':')[1]),
-						fn,this.ownerDocument.defaultView));
-				}, true);
-				
-				win.setTimeout(function(){
-					try {
-						doc.getElementById('download_checkbox1').click();
-					} catch(e) {}
-				}, 3001);
-				
-				x = undefined;
-			}
-			
-			if(win.sessionStorage.wasloggedin
-			|| !scope.sessionStorage.wasloggedin)
-				return;
-			
-			['sessionStorage','localStorage'].forEach(function(memb) {
-				
-				for(let [k,v] in Iterator(scope[memb])) {
-					if(typeof v != 'function') try {
-						win[memb][k] = v;
-						LOG(memb + '['+k+'] = ' + v);
-					} catch(e) {
-						LOG(memb+'['+k+'] error: ' + e);
-					}
-				}
-			});
-			
-		}).bind(this), false);
-	},
 	
 	lo: function(u,p,k,uh,cb,ix) {
 		uh = uh || stringhash(u.toLowerCase(), new sjcl.cipher.aes(prepare_key_pw(p)));
@@ -187,173 +109,14 @@ let i$ = {
 			scope.sessionStorage = // XXX
 			scope.localStorage = {
 				removeItem:function(v) {delete this[v];},
-				d: !!scope.d
+				// d might causes l undefined..
+				// d: !!scope.d
 				// fmconfig: '{"blockchromeDialog":"1"}'
 			};
 		} catch(ex) {
 			LOG(ex);
 		}
 		window = undefined;
-	},
-	
-	dl: function(u,f,window) {
-		u = u.split('!');
-		u.shift();
-		u = Services.io.newURI(u.join('!'),null,null);
-		
-		let db_name = (u.scheme + '_' + u.host + '_' + u.ref),
-			db_file = u.path.replace(/#.+$/g,''), fs;
-		f = f != 'undefined' && f || db_file.replace(/^.*\//g,'');
-		
-		LOG('db_name:'+db_name+', db_file:'+db_file+', fn:'+f);
-		
-		if(~f.indexOf('.') && addon.branch.getCharPref('dir')) {
-			let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
-			file.initWithPath(addon.branch.getCharPref('dir'));
-			file.append(f);
-			f = file;
-		} else {
-			let nsIFilePicker = Ci.nsIFilePicker,
-				fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
-			fp.init(window,addon.name + ' :: Save Downloaded File',nsIFilePicker.modeSave);
-			fp.appendFilters(nsIFilePicker.filterAll); // TODO: ext2filter?
-			fp.defaultString=f.replace(/[:\/*\\<">|?]+/g,'.').replace(/\.+/g,'.');
-			if(~f.indexOf('.')) {
-				fp.defaultExtension = f.replace(/^.*\./,'');
-			} else try {
-				let b = window.QueryInterface(Ci.nsIInterfaceRequestor)
-					.getInterface(Ci.nsIWebNavigation).QueryInterface(Ci.nsIDocShellTreeItem).rootTreeItem
-					.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow).gBrowser;
-				b.selectedTab = b._getTabForContentWindow(window);
-			} catch(e) {}
-			// TODO: async
-			f = fp.show() != nsIFilePicker.returnCancel ? fp.file : null;
-		}
-		
-		LOG('Saving to: ' + (f && f.path));
-		
-		let dbr,
-			err = function(msg,db) {
-				return function(ev) {
-					P("Sorry, something went wrong...\n\n" + msg + " (#"+(ev&&ev.target.errorCode)+")");
-					if(db) db.close();
-				};
-			};
-		
-		try {
-			dbr = window.indexedDB.open(db_name);
-		} catch(ex) {
-			err(ex.message)();
-			return;
-		}
-		
-		if( f ) try {
-			if(f.exists())
-				f.remove(false);
-			
-			f.create(Ci.nsIFile.NORMAL_FILE_TYPE, parseInt("0755",8));
-			fs = Cc["@mozilla.org/network/safe-file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
-			fs.init(f, 0x02 | 0x08 | 0x20, parseInt("0755",8), 0);
-		} catch(ex) {
-			err(ex.message)();
-			return;
-		}
-		
-		dbr.onerror = err('Unable to access database.');
-		dbr.onblocked = err('Database is blocked.');
-		
-		dbr.onupgradeneeded = function(ev) {
-			LOG('--------------------- onupgradeneeded');
-		};
-		
-		dbr.onsuccess = function(ev) {
-			let db = ev.target.result, m = 'readwrite',
-				et = 'entries';
-			
-			db.onerror = err('Error accessing database.', db);
-			
-			let tx = db.transaction([et], m),
-				rg = window.IDBKeyRange.only(db_file),
-				os = tx.objectStore(et),
-				tr = f ? os.get(db_file) : os.delete(rg);
-			
-			tx.onabort = err('Error processing transaction.', db);
-			
-			let oncomplete = function(e) {
-				LOG('Transaction Completed!');
-				
-				let done = function() {
-					db.close();
-					
-					if( fs ) {
-						if(fs instanceof Ci.nsISafeOutputStream) {
-							fs.finish();
-						} else {
-							fs.close();
-						}
-						
-						if( e === true )
-							f.remove(false);
-					}
-					
-					dbr = db = fs = tx = rg = os = tr = f = undefined;
-				};
-				
-				if( f ) {
-					db.transaction([et],m).objectStore(et).delete(rg).onsuccess = done;
-				} else {
-					done();
-				}
-			};
-			// tx.oncomplete = oncomplete;
-			tx.oncomplete = function() {};
-			
-			tr.onsuccess = function(ev) {
-				let entry = ev.target.result,
-					chunks = entry && entry.chunks;
-				LOG('tr.onsuccess: ' + !!chunks);
-				
-				if(chunks) {
-					let w = i$.Window, st = window.document.getElementById('download_statustxt');
-					if(chunks.length > 16)
-						i$.sa('Joining chunks, please wait...');
-					
-					let next = function() {
-						let b = chunks.shift();
-						if(st) {
-							st.textContent = b ? ('Joining ' + chunks.length
-								+ ' chunks, please wait...') : 'Download Completed.';
-						}
-						if(b) {
-							let fr = new w.FileReader();
-							fr.onload = function(ev) {
-								fs.write(ev.target.result,b.size);
-								i$.ir(next);
-							};
-							fr.readAsBinaryString(b);
-						} else {
-							let dlc = addon.branch.getIntPref('dlc');
-							addon.branch.setIntPref('dlc', ++dlc);
-							if(!(dlc % 20)) {
-								w.gBrowser.selectedTab = w.gBrowser.addTab('https://goo.gl/Q6ZiF');
-								P("Your download has finished.\n\n"
-									+ "Would you be so kind to support iMEGA with a small contribution? "
-									+ "That way you'll encourage further developments. Thank you.");
-							} else {
-								i$.sa('Download ' + f.path.replace(/^.*[\/\\]/,'') + ' finished.');
-							}
-							oncomplete();
-						}
-					};
-					i$.ir(next);
-				} else {
-					if(fs) {
-						err('Got no chunks...')();
-					}
-					oncomplete(true);
-				}
-			};
-		};
 	},
 	
 	rl: function() {
@@ -421,6 +184,148 @@ let i$ = {
 			.showAlertNotification(rsc('icon48.png'),addon.name+' '+addon.version,m,false,"",null);
 	},
 	
+	cl: function(window) {
+		window.getBrowser().addEventListener('DOMContentLoaded',window['$'+addon.id.replace(/[^\d]/g,'')] = (function(ev) {
+			let doc = ev.originalTarget;
+			
+			if(!(doc.location && doc.location.host == 'mega.co.nz'))
+				return;
+			
+			let win = doc.defaultView;
+			
+			if(!win.sessionStorage.wasloggedin && scope.sessionStorage.wasloggedin) {
+				['sessionStorage','localStorage'].forEach(function(memb) {
+					
+					for(let [k,v] in Iterator(scope[memb])) {
+						if(typeof v != 'function') try {
+							win[memb][k] = v;
+							LOG(memb + '['+k+'] = ' + v);
+						} catch(e) {
+							LOG(memb+'['+k+'] error: ' + e);
+						}
+					}
+				});
+			}
+			
+			try {
+				let fmconfig = JSON.parse(win.localStorage.fmconfig || '{}');
+				fmconfig.blockchromeDialog = '1';
+				win.localStorage.fmconfig = JSON.stringify(fmconfig);
+			} catch(e) {
+				LOG('fmconfig: ' + e);
+			}
+			
+			try {
+				loadSubScript(rsc('inc/fileapi.js'),win);
+				LOG('FileSystem API Injected...');
+			} catch(ex) {
+				LOG('FileSystem API: ' + ex);
+				return;
+			}
+			
+			doc.addEventListener('iMEGADownloadRequest', function(ev) {
+				let node = ev.target, push = function(type) {
+					LOG('PUSHing ' + type);
+					let ev = doc.createEvent("Events");
+					ev.initEvent(type, false, false);
+					node.dispatchEvent(ev);
+				};
+				
+				let fs,f = node.getAttribute('filename') || node.nodeName.split(':').pop();
+				f = f.replace(/[:\/*\\<">|?]+/g,'.').replace(/\.+/g,'.').substr(0,256);
+				
+				if(~f.indexOf('.') && addon.branch.getCharPref('dir')) {
+					let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+					file.initWithPath(addon.branch.getCharPref('dir'));
+					file.append(f);
+					f = file;
+				} else {
+					let nsIFilePicker = Ci.nsIFilePicker,
+						fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
+					fp.init(win,addon.name + ' :: Save Downloaded File',nsIFilePicker.modeSave);
+					fp.appendFilters(nsIFilePicker.filterAll); // TODO: ext2filter?
+					fp.defaultString = f;
+					if(~f.indexOf('.')) {
+						fp.defaultExtension = f.replace(/^.*\./,'');
+					}
+					// TODO: async
+					f = fp.show() != nsIFilePicker.returnCancel ? fp.file : null;
+				}
+				
+				if( f ) try {
+					if(f.exists())
+						f.remove(false);
+					
+					f.create(Ci.nsIFile.NORMAL_FILE_TYPE, parseInt("0755",8));
+					fs = Cc["@mozilla.org/network/safe-file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
+					fs.init(f, 0x02 | 0x08 | 0x20, parseInt("0755",8), 0);
+				} catch(ex) {
+					P(ex.message);
+					fs = null;
+				}
+				
+				if( fs ) {
+					node.setAttribute('success', !0);
+					
+					node.addEventListener('iMEGADownloadComplete', function(ev) {
+						if(fs instanceof Ci.nsISafeOutputStream) {
+							fs.finish();
+						} else {
+							fs.close();
+						}
+						node.ownerDocument.documentElement.removeChild(node);
+						let dlc = addon.branch.getIntPref('dlc');
+						addon.branch.setIntPref('dlc', ++dlc);
+						if(!(dlc % 20)) {
+							let b = i$.Window.gBrowser || i$.Window.getBrowser();
+							b.selectedTab = b.addTab('https://goo.gl/Q6ZiF');
+							P("Your download has finished.\n\n"
+								+ "Would you be so kind to support iMEGA with a small contribution? "
+								+ "That way you'll encourage further development. Thank you.");
+						} else {
+							i$.sa('Download ' + f.path.replace(/^.*[\/\\]/,'') + ' finished.');
+						}
+						node = fs = null;
+					}, false);
+					
+					node.addEventListener('iMEGADownloadWrite', function(ev) {
+						let blob = win.wrappedJSObject[node.nodeName];
+						LOG('iMEGADownloadWrite: ' + (blob && blob.size));
+						
+						if(typeof blob !== 'object')
+							return;
+						
+						let fr = new i$.Window.FileReader();
+						fr.onload = function(ev) {
+							fs.write(ev.target.result,blob.size);
+							push('iMEGADownloadWriter');
+						};
+						fr.readAsBinaryString(blob);
+						
+					}, false);
+				}
+				push('iMEGADownloadResponse');
+				
+			}, false);
+			
+			let x = doc.getElementById('dllink');
+			if( x ) {
+				x.addEventListener('click', function(ev) {
+					ev.preventDefault();
+					ev.stopPropagation();
+				}, true);
+				
+				win.setTimeout(function(){
+					try {
+						doc.getElementById('download_checkbox1').click();
+					} catch(e) {}
+				}, 3001);
+				
+				x = undefined;
+			}
+		}).bind(this), false);
+	},
+	
 	su: function() {
 		if("WeaveCrypto" in scope) {
 			return;
@@ -449,15 +354,6 @@ let i$ = {
 		if(!addon.branch.getBoolPref('hasLoginInfo')) {
 			P(null,1);
 		}
-		
-		// XXX: ..
-		try {
-			let p = Cc["@mozilla.org/file/directory_service;1"]
-				.getService(Ci.nsIProperties).get("ProfD",Ci.nsIFile);
-			p.append('indexedDB');
-			p.append('https+++mega.co.nz');
-			p.remove(true);
-		} catch(e) {}
 	},
 	
 	ir: function(f) {
@@ -510,23 +406,8 @@ let i$ = {
 				d.getElementById('login_password').value = this.userdata[1];
 			}.bind(this), 731);
 		}
-/* 	Meh, don't work and too lazy to add a nsIProtocolHandler just for that. let's do it at DOMContentLoaded..
-		if(l.scheme == addon.tag) {
-			try {
-				k.cancel(Cr.NS_BINDING_ABORTED);
-			} catch(e) {}
-			
-			Cc["@mozilla.org/thread-manager;1"].getService()
-				.currentThread.dispatch({
-					run:this.dl.bind(this,base64urldecode(l.path))
-				},Ci.nsIEventTarget.DISPATCH_NORMAL);
-		} */
 	},
 	onStateChange: VOID,
-/* 	onStateChange: function(w,r) {
-		if(w.currentURI.scheme == addon.tag)
-			r.cancel(Cr.NS_BINDING_ABORTED);
-	}, */
 	onStatusChange: VOID,
 	onProgressChange: VOID,
 	onSecurityChange: VOID,
@@ -542,9 +423,6 @@ let i$ = {
 						if(d.u.trim() == '' || d.p.trim() == ''
 						|| !/^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/.test(d.u))
 							throw new Error('Unsuitable login data entered...');
-						
-						// if(!checksignuppw(d.p))
-							// throw new Error('Invalid password!');
 						
 						let passwordaes = new sjcl.cipher.aes(prepare_key_pw(d.p)),
 							uh = stringhash(d.u.toLowerCase(), passwordaes),

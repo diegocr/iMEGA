@@ -4,7 +4,7 @@
 		<em:id>{065ee92a-ad57-42a2-b6d5-466b6fd8e24d}</em:id>
 		<em:type>2</em:type>
 		<em:name>iMEGA</em:name>
-		<em:version>0.2.1a3</em:version>
+		<em:version>0.2.1</em:version>
 		<em:creator>Diego Casorran &lt;dcasorran@gmail.com&gt;</em:creator>
 		<em:description>This add-on is intended to ease the life of the regular MEGA user.</em:description>
 		<em:bootstrap>true</em:bootstrap>
