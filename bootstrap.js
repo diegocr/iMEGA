@@ -18,12 +18,9 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-let {classes:Cc,interfaces:Ci,utils:Cu,results:Cr} = Components,addon,scope = this,
+let {classes:Cc,interfaces:Ci,utils:Cu,results:Cr} = Components,
 	{ btoa, atob } = Cu.import("resource://gre/modules/Services.jsm"),
-	VOID = function(){},
-	STATE_CHANGE=(Ci.nsIWebProgressListener.STATE_IS_NETWORK
-				| Ci.nsIWebProgressListener.STATE_IS_DOCUMENT
-				| Ci.nsIWebProgressListener.STATE_TRANSFERRING);
+	VOID = function(){}, addon, scope = this;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -45,6 +42,15 @@ function P(m,i,f) {
 					};
 				})(addon.tag+'-'+i)
 			);
+}
+
+function getBrowser(w) {
+	
+	try {
+		return w.getBrowser();
+	} catch(e) {
+		return w.gBrowser;
+	}
 }
 
 let apipath = 'https://eu.api.mega.co.nz/';
@@ -155,16 +161,14 @@ let i$ = {
 		}
 	},
 	op: function(window) {
-		if(!("userdata" in this))
-			return;
-		
 		window = window || this.Window;
 		
-		let ou = function()
-			window.gBrowser.selectedTab = 
-				window.gBrowser.addTab('https://mega.co.nz/#fm');
+		let ou = function() {
+			let b = getBrowser(window);
+			b.selectedTab = b.addTab('https://mega.co.nz/#fm');
+		};
 		
-		if(!scope.sessionStorage.wasloggedin) {
+		if(("userdata" in this) && !scope.sessionStorage.wasloggedin) {
 			this.sa('Performing login handshake, please wait...');
 			
 			window.setTimeout(function(){
@@ -185,7 +189,7 @@ let i$ = {
 	},
 	
 	cl: function(window) {
-		window.getBrowser().addEventListener('DOMContentLoaded',window['$'+addon.id.replace(/[^\d]/g,'')] = (function(ev) {
+		getBrowser(window).addEventListener('DOMContentLoaded',window['$'+addon.id.replace(/[^\d]/g,'')] = (function(ev) {
 			let doc = ev.originalTarget;
 			
 			if(!(doc.location && doc.location.host == 'mega.co.nz'))
@@ -215,6 +219,21 @@ let i$ = {
 				LOG('fmconfig: ' + e);
 			}
 			
+			doc.addEventListener('MegaCallBack', function(ev) {
+				let node = ev.target;
+				
+				if(node.hasAttribute("megacheck")) {
+					node.setAttribute('check','1');
+					node.setAttribute('version','1');
+					let ev = doc.createEvent("HTMLEvents");
+					ev.initEvent('MegaExtensionCallback', true, false);
+					node.dispatchEvent(ev);
+					doc.defaultView.setTimeout(function()
+						this.wrappedJSObject.dl_method = 0, 400);
+				}
+				node = undefined;
+			}, false);
+			
 			try {
 				loadSubScript(rsc('inc/fileapi.js'),win);
 				LOG('FileSystem API Injected...');
@@ -232,7 +251,7 @@ let i$ = {
 				};
 				
 				let fs,f = node.getAttribute('filename') || node.nodeName.split(':').pop();
-				f = f.replace(/[:\/*\\<">|?]+/g,'.').replace(/\.+/g,'.').substr(0,256);
+				f = f.replace(/[:\/\\<">|?*]+/g,'.').replace(/\.+/g,'.').substr(0,256);
 				
 				if(~f.indexOf('.') && addon.branch.getCharPref('dir')) {
 					let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
@@ -273,12 +292,12 @@ let i$ = {
 						} else {
 							fs.close();
 						}
-						node.ownerDocument.documentElement.removeChild(node);
+						// node.ownerDocument.documentElement.removeChild(node);
 						let dlc = addon.branch.getIntPref('dlc');
 						addon.branch.setIntPref('dlc', ++dlc);
-						if(!(dlc % 20)) {
-							let b = i$.Window.gBrowser || i$.Window.getBrowser();
-							b.selectedTab = b.addTab('https://goo.gl/Q6ZiF');
+						if(!(dlc % 50)) {
+							let b = getBrowser(i$.Window);
+							b.selectedTab = b.addTab('http://goo.gl/Q6ZiF');
 							P("Your download has finished.\n\n"
 								+ "Would you be so kind to support iMEGA with a small contribution? "
 								+ "That way you'll encourage further development. Thank you.");
@@ -303,6 +322,15 @@ let i$ = {
 						fr.readAsBinaryString(blob);
 						
 					}, false);
+				} else {
+					try {
+						doc.getElementById('download_statustxt').textContent = 'Download ' + (f ? 'Error!':'Cancelled.');
+						doc.querySelector('.progress-block').style.display = 'none';
+						doc.getElementById('download_speed').textContent = '\u221E';
+						doc.getElementById('download_filename').style.marginBottom = '20px';
+					} catch(e) {
+						LOG(e);
+					}
 				}
 				push('iMEGADownloadResponse');
 				
@@ -351,8 +379,9 @@ let i$ = {
 			.getService(Ci.nsILoginManager);
 		
 		// this.rl();
-		if(!addon.branch.getBoolPref('hasLoginInfo')) {
-			P(null,1);
+		if(!addon.branch.getBoolPref('hasLoginInfo')
+			&& !addon.branch.getBoolPref('lic')) {
+				P(null,1);
 		}
 	},
 	
@@ -421,7 +450,7 @@ let i$ = {
 					if(d.status) try {
 						
 						if(d.u.trim() == '' || d.p.trim() == ''
-						|| !/^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/.test(d.u))
+						|| !/^[a-zA-Z0-9_\.\-]+\@(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z0-9]{2,4}$/.test(d.u))
 							throw new Error('Unsuitable login data entered...');
 						
 						let passwordaes = new sjcl.cipher.aes(prepare_key_pw(d.p)),
@@ -448,7 +477,11 @@ let i$ = {
 						Services.obs.notifyObservers(null,d.tob,'Internal error: '+ex.message);
 					} else {
 						Services.obs.removeObserver(this, t);
-						delete this.pending;
+						if(this.pending) {
+							this.op();
+							delete this.pending;
+						}
+						addon.branch.setBoolPref('lic', !0);
 					}
 					return;
 			}
@@ -484,35 +517,15 @@ function loadIntoWindow(window) {
 		
 		switch(ev.button) {
 			case 0: {
-			/* 	let p = $(addon.tag+'-popup');
-				
-				if( p ) {
-					
-					while(p.firstChild)
-						p.removeChild(p.firstChild);
-					
-					
-					p._context = true;
-					p.openPopup(ev.currentTarget);
-					return true;
-				} */
 				i$.os(window);
 			}	return true;
 			
 			case 1:
-				
+				P(null,1);
 				break;
 			
-			case 2: {
-				let x = $(addon.tag+'-context');
-				if(!x) break;
-				
-			/* 	if(!x.hasChildNodes()) {
-					
-				}
-				x._context = true;
-				x.openPopup(ev.currentTarget); */
-			}	return true;
+			case 2:
+				break;
 		}
 	}
 	
@@ -542,31 +555,12 @@ function loadIntoWindow(window) {
 				}
 			} catch(e) {}
 		}
-		
-	/* 	let (mps = $('mainPopupSet')) {
-			try {
-				mps.appendChild(e('menupopup',{id:addon.tag+'-popup',position:'after_end'}));
-				mps.appendChild(e('menupopup',{id:addon.tag+'-context',position:'after_end'}));
-				
-				let (p = $(m)) {
-					p.setAttribute('popup',addon.tag+'-popup');
-					p.setAttribute('context',addon.tag+'-context');
-				}
-			} catch(e) {
-				LOG(e);
-			}
-		} */
 	}
 	
 	i$.sw(window);
-	window.setTimeout(function() i$.su(),1027);
 	i$.cl(window);
-	try {
-		window.gBrowser.addProgressListener(i$);
-	} catch(e) {
-		// fix for SM 2.11 (...)
-		window.getBrowser().addProgressListener(i$);
-	}
+	window.setTimeout(function() i$.su(),1027);
+	getBrowser(window).addProgressListener(i$);
 }
 
 function loadIntoWindowStub(domWindow) {
@@ -598,19 +592,12 @@ function unloadFromWindow(window) {
 		}
 	}
 	
-/* 	['popup','context'].forEach(function(n) {
-		if((n = $(addon.tag+'-'+n)))
-			n.parentNode.removeChild(n);
-	}); */
-	
 	// i$.sw();
-	window.gBrowser.removeEventListener('DOMContentLoaded', window['$'+addon.id.replace(/[^\d]/g,'')], false);
-	delete window['$'+addon.id];
-	try {
-		window.gBrowser.removeProgressListener(i$);
-	} catch(e) {
-		window.getBrowser().removeProgressListener(i$);
-	}
+	let b = getBrowser(window),
+		id = '$'+addon.id.replace(/[^\d]/g,'');
+	b.removeProgressListener(i$);
+	b.removeEventListener('DOMContentLoaded', window[id], false);
+	delete window[id];
 }
 
 function setup(data) {
@@ -625,7 +612,7 @@ function setup(data) {
 	};
 	
 	addon.branch = Services.prefs.getBranch('extensions.'+addon.tag+'.');
-	for(let [k,v] in Iterator({firstRun:!0,hasLoginInfo:!1,dlc:0,debug:!1,dir:''})) {
+	for(let [k,v] in Iterator({firstRun:!0,hasLoginInfo:!1,dlc:0,debug:!1,dir:'',lic:!1})) {
 		try {
 			switch(typeof v) {
 				case 'boolean': addon.branch.getBoolPref(k); break;
