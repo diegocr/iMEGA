@@ -244,14 +244,14 @@ let i$ = {
 			
 			doc.addEventListener('iMEGADownloadRequest', function(ev) {
 				let node = ev.target, push = function(type) {
-					LOG('PUSHing ' + type);
+					// LOG('PUSHing ' + type);
 					let ev = doc.createEvent("Events");
 					ev.initEvent(type, false, false);
 					node.dispatchEvent(ev);
 				};
 				
 				let fs,f = node.getAttribute('filename') || node.nodeName.split(':').pop();
-				f = f.replace(/[:\/\\<">|?*]+/g,'.').replace(/\.+/g,'.').substr(0,256);
+				f = f.replace(/[:\/\\<">|?*]+/g,'.').replace(/\s*\.+/g,'.').substr(0,256);
 				
 				if(~f.indexOf('.') && addon.branch.getCharPref('dir')) {
 					let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
@@ -309,12 +309,12 @@ let i$ = {
 					
 					node.addEventListener('iMEGADownloadWrite', function(ev) {
 						let blob = win.wrappedJSObject[node.nodeName];
-						LOG('iMEGADownloadWrite: ' + (blob && blob.size));
+						// LOG('iMEGADownloadWrite: ' + (blob && blob.size));
 						
 						if(typeof blob !== 'object')
 							return;
 						
-						let fr = new i$.Window.FileReader();
+						let fr = new window.FileReader();
 						fr.onload = function(ev) {
 							fs.write(ev.target.result,blob.size);
 							push('iMEGADownloadWriter');
@@ -340,7 +340,7 @@ let i$ = {
 			if( x ) {
 				x.addEventListener('click', function(ev) {
 					ev.preventDefault();
-					ev.stopPropagation();
+					// ev.stopPropagation();
 				}, true);
 				
 				win.setTimeout(function(){
