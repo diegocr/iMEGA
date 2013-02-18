@@ -33,7 +33,7 @@ let args, iObs = {
 			switch (t) {
 			case 'imegaa-login-result':
 				if ((document.getElementById('login_message').value = '' + d) == 'Logged.') {
-					window.setTimeout(window.close.bind(window), 800);
+					window.setTimeout(window.close.bind(window), 950);
 				} else {
 					document.documentElement.getButton("accept").disabled = false;
 					document.getElementById('login_password').value = '';
@@ -68,7 +68,7 @@ function onUnload(g) {
 	}
 	
 	args[2](result);
-	while (g = iObs.waiting.pop())
+	while ((g = iObs.waiting.pop()))
 		try {
 			Services.obs.removeObserver(iObs, g);
 		} catch (e) {}

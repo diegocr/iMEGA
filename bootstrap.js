@@ -125,7 +125,7 @@ let i$ = {
 		window = undefined;
 	},
 	
-	rl: function() {
+	rl: function(ask) {
 		try {
 			let hasLoginInfo = addon.branch.getBoolPref('hasLoginInfo');
 			
@@ -138,7 +138,7 @@ let i$ = {
 				}
 			}
 			
-			if(!hasLoginInfo) {
+			if(ask && !hasLoginInfo) {
 				P(null,1);
 			}
 			
@@ -153,12 +153,15 @@ let i$ = {
 	},
 	
 	os: function(window) {
-		if("userdata" in this || this.rl()) {
+	/* 	if("userdata" in this || this.rl()) {
 			this.op(window);
 		} else {
 			this.pending = true;
 			// P(null,1);
-		}
+		} */
+		// Meh, just open the site..
+		("userdata" in this || this.rl());
+		this.op(window);
 	},
 	op: function(window) {
 		window = window || this.Window;
@@ -182,10 +185,38 @@ let i$ = {
 		}
 	},
 	
-	sa: function(m) {
-		LOG(m);
-		Cc["@mozilla.org/alerts-service;1"].getService(Ci.nsIAlertsService)
-			.showAlertNotification(rsc('icon48.png'),addon.name+' '+addon.version,m,false,"",null);
+	sa: function(m,x,cb) {
+		LOG('SA: '+m);
+		let i = rsc('icon48.png'), t = addon.name+' '+(x || addon.version);
+		try {
+			Cc["@mozilla.org/alerts-service;1"].getService(Ci.nsIAlertsService)
+				.showAlertNotification(i,t,m,!!cb,"",cb, addon.name);
+		} catch(e) {
+			let aw = Services.ww.openWindow(null,"chrome://global/content/alerts/alert.xul",
+				"_blank", "chrome,titlebar=no,popup=yes", null);
+			
+			aw.arguments = [i,t,m, !!cb, "", cb, addon.name];
+		}
+	},
+	
+	nf: function(f,p,e) {
+		let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+		file.initWithPath(p);
+		if(e) e.forEach(function(s) file.append(s));
+		file.append(f);
+		return file;
+	},
+	
+	gp: function(p,e) {
+		let path = p.split(/[\\\/]+/),
+			file = path.pop();
+		if(e) {
+			let tmp = [].concat(path), l;
+			while((l = tmp.pop()) == e.pop());
+			tmp.push(l);
+			path = tmp;
+		}
+		return { file : file, path: path.join(path[0][1] === ':' ? '\\':'/')};
 	},
 	
 	cl: function(window) {
@@ -211,13 +242,14 @@ let i$ = {
 				});
 			}
 			
+		/* No longer needed..
 			try {
 				let fmconfig = JSON.parse(win.localStorage.fmconfig || '{}');
 				fmconfig.blockchromeDialog = '1';
 				win.localStorage.fmconfig = JSON.stringify(fmconfig);
 			} catch(e) {
 				LOG('fmconfig: ' + e);
-			}
+			} */
 			
 			doc.addEventListener('MegaCallBack', function(ev) {
 				let node = ev.target;
@@ -242,6 +274,7 @@ let i$ = {
 				return;
 			}
 			
+			let last_path;
 			doc.addEventListener('iMEGADownloadRequest', function(ev) {
 				let node = ev.target, push = function(type) {
 					// LOG('PUSHing ' + type);
@@ -250,14 +283,13 @@ let i$ = {
 					node.dispatchEvent(ev);
 				};
 				
-				let fs,f = node.getAttribute('filename') || node.nodeName.split(':').pop();
+				let fs,f = node.getAttribute('filename') || node.nodeName.split(':').pop(),
+					fld = node.hasAttribute('folder')
+						&& node.getAttribute('folder').split(/[\\\/]+/).filter(String);
 				f = f.replace(/[:\/\\<">|?*]+/g,'.').replace(/\s*\.+/g,'.').substr(0,256);
 				
-				if(~f.indexOf('.') && addon.branch.getCharPref('dir')) {
-					let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
-					file.initWithPath(addon.branch.getCharPref('dir'));
-					file.append(f);
-					f = file;
+				if((last_path && fld) || (~f.indexOf('.') && addon.branch.getCharPref('dir'))) {
+					f = i$.nf(f,fld && last_path || addon.branch.getCharPref('dir'),fld);
 				} else {
 					let nsIFilePicker = Ci.nsIFilePicker,
 						fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
@@ -269,7 +301,15 @@ let i$ = {
 					}
 					// TODO: async
 					f = fp.show() != nsIFilePicker.returnCancel ? fp.file : null;
+					
+					if( f && fld ) {
+						let s = i$.gp(f.path);
+						f = i$.nf(s.file,s.path,fld);
+					}
 				}
+				
+				last_path = fld && f && i$.gp(f.path,fld).path;
+				LOG('Saving To: ' + (f && f.path) + ' -- Next path: ' + last_path);
 				
 				if( f ) try {
 					if(f.exists())
@@ -286,25 +326,67 @@ let i$ = {
 				if( fs ) {
 					node.setAttribute('success', !0);
 					
+					let startTime = Date.now();
 					node.addEventListener('iMEGADownloadComplete', function(ev) {
+						let fn = f.path.replace(/^.*[\/\\]/g, '');
 						if(fs instanceof Ci.nsISafeOutputStream) {
 							fs.finish();
 						} else {
 							fs.close();
 						}
-						// node.ownerDocument.documentElement.removeChild(node);
-						let dlc = addon.branch.getIntPref('dlc');
-						addon.branch.setIntPref('dlc', ++dlc);
+						try {
+							let dl = {
+								name: fn,
+								source: node.ownerDocument.location.href,
+								target: Services.io.newFileURI(f).spec,
+								startTime: startTime * 1000,
+								endTime: Date.now() * 1000,
+								state: Ci.nsIDownloadManager.DOWNLOAD_FINISHED,
+								currBytes: parseInt(node.getAttribute('filesize')),
+								maxBytes: parseInt(node.getAttribute('filesize')),
+							};
+							try {
+								dl.mimeType = Cc["@mozilla.org/mime;1"].getService(Ci.nsIMIMEService).getTypeFromFile(f);
+							} catch(e) {}
+							let stm = Cc["@mozilla.org/download-manager;1"]
+								.getService(Ci.nsIDownloadManager).DBConnection.createStatement(
+									'INSERT INTO moz_downloads ('+Object.keys(dl)+')' +
+									'VALUES                    ('+Object.keys(dl).map(function(n) ':'+n)+')');
+							
+							for(let n in dl)
+								stm.params[n] = dl[n];
+							stm.execute();
+							stm.finalize();
+							f = null;
+						} catch(e) {
+							LOG(e);
+						}
+						let dlc = 1, dmui = Services.wm.getMostRecentWindow('Download:Manager');
+						if(dmui) try {
+							dmui.buildDownloadList(!0);
+						} catch(e) {}
+						if(node.ownerDocument.location.hash.substr(0,3) !== '#fm') {
+							dlc = addon.branch.getIntPref('dlc');
+							addon.branch.setIntPref('dlc', ++dlc);
+						}
 						if(!(dlc % 50)) {
 							let b = getBrowser(i$.Window);
 							b.selectedTab = b.addTab('http://goo.gl/Q6ZiF');
 							P("Your download has finished.\n\n"
 								+ "Would you be so kind to support iMEGA with a small contribution? "
 								+ "That way you'll encourage further development. Thank you.");
+						} else if(!f) {
+							i$.sa(fn,'Download Finished.',function(s,t) {
+								if(t !== 'alertfinished') try {
+									let dlui = Components.classesByID["{7dfdf0d1-aff6-4a34-bad1-d0fe74601642}"]
+										.getService(Ci.nsIDownloadManagerUI);
+									dlui.show();
+								} catch(e) {}
+							});
 						} else {
-							i$.sa('Download ' + f.path.replace(/^.*[\/\\]/,'') + ' finished.');
+							i$.sa('Download ' + fn + ' finished.');
 						}
-						node = fs = null;
+						node = fs = f = undefined;
 					}, false);
 					
 					node.addEventListener('iMEGADownloadWrite', function(ev) {
@@ -463,12 +545,11 @@ let i$ = {
 										if(i$.sl(d.u,d.p,r,uh) && i$.pending) {
 											i$.Window.setTimeout(i$.op.bind(i$),300);
 										}
+										delete i$.pending;
+										Services.obs.removeObserver(i$, t);
 									}
 									Services.obs.notifyObservers(null,d.tob,r ? 'Logged.'
 										: 'Incorrect e-mail and/or password. Please try again.');
-									
-									delete i$.pending;
-									Services.obs.removeObserver(i$, t);
 								}
 							};
 						u_login(ctx, d.u, d.p, uh, true);
@@ -476,12 +557,12 @@ let i$ = {
 					} catch(ex) {
 						Services.obs.notifyObservers(null,d.tob,'Internal error: '+ex.message);
 					} else {
-						Services.obs.removeObserver(this, t);
 						if(this.pending) {
 							this.op();
 							delete this.pending;
 						}
 						addon.branch.setBoolPref('lic', !0);
+						break;
 					}
 					return;
 			}

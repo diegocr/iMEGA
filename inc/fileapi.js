@@ -74,6 +74,10 @@
 				let node = scope.document.createElement("iMEGADownload" + File.name.replace('/',':','g'));
 				node.setAttribute("filename", scope.dl_filename);
 				node.setAttribute("filesize", scope.dl_filesize);
+				try {
+					if(scope.dl_queue[scope.dl_queue_num].p)
+						node.setAttribute("folder", scope.dl_queue[scope.dl_queue_num].p);
+				} catch(e) {}
 				scope.document.documentElement.appendChild(node);
 				
 				node.addEventListener('iMEGADownloadWriter', function(ev) {
