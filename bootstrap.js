@@ -317,6 +317,7 @@ let i$ = {
 					
 					f.create(Ci.nsIFile.NORMAL_FILE_TYPE, parseInt("0755",8));
 					fs = Cc["@mozilla.org/network/safe-file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
+					fs.QueryInterface(Ci.nsISeekableStream);
 					fs.init(f, 0x02 | 0x08 | 0x20, parseInt("0755",8), 0);
 				} catch(ex) {
 					P(ex.message);
@@ -325,6 +326,15 @@ let i$ = {
 				
 				if( fs ) {
 					node.setAttribute('success', !0);
+					
+					try {
+						let maxSlots = addon.branch.getIntPref('dls') || 4;
+						if(maxSlots != 4) {
+							node.ownerDocument.defaultView.wrappedJSObject.dl_maxSlots = maxSlots;
+						}
+					} catch(e) {
+						LOG(e);
+					}
 					
 					let startTime = Date.now();
 					node.addEventListener('iMEGADownloadComplete', function(ev) {
@@ -387,6 +397,12 @@ let i$ = {
 							i$.sa('Download ' + fn + ' finished.');
 						}
 						node = fs = f = undefined;
+					}, false);
+					
+					node.addEventListener('iMEGADownloadSeek', function(ev) {
+						let pos = node.getAttribute('data');
+						// LOG('iMEGADownloadSeek: ' + pos);
+						fs.seek(0,pos);
 					}, false);
 					
 					node.addEventListener('iMEGADownloadWrite', function(ev) {
@@ -693,7 +709,7 @@ function setup(data) {
 	};
 	
 	addon.branch = Services.prefs.getBranch('extensions.'+addon.tag+'.');
-	for(let [k,v] in Iterator({firstRun:!0,hasLoginInfo:!1,dlc:0,debug:!1,dir:'',lic:!1})) {
+	for(let [k,v] in Iterator({firstRun:!0,hasLoginInfo:!1,dlc:0,dls:4,debug:!1,dir:'',lic:!1})) {
 		try {
 			switch(typeof v) {
 				case 'boolean': addon.branch.getBoolPref(k); break;

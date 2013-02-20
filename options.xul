@@ -3,4 +3,7 @@
 	<setting pref="extensions.imega.dir" type="directory" title="Downloads Folder:">
 		Default location where downloads will be saved.
 	</setting>
+	<setting pref="extensions.imega.dls" type="integer" title="Download Slots" valueNumber="4" min="1" max="20">
+		How many chunks to download simultaneously.
+	</setting>
 </vbox>

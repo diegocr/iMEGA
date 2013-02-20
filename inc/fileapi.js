@@ -27,13 +27,17 @@
 	}
 	
 	scope.webkitStorageInfo = {
-		requestQuota: function() {}
+		TEMPORARY: 0,
+		requestQuota: function(t,s,f) f(s),
+		queryUsageAndQuota: function(t,f) f(0,1e11)
 	};
-
+	
 	scope.TEMPORARY = 0;
 	
-	let push = function(type, node) {
+	let push = function(type, node, data) {
 		let ev = scope.document.createEvent("Events");
+		if(data)
+			node.setAttribute('data', data);
 		ev.initEvent(type, true, false);
 		node.dispatchEvent(ev);
 	};
@@ -61,9 +65,13 @@
 							position : 0,
 							write : function(x) {
 								this.readyState = this.WRITING;
+								this.position = this.writepos+x.size;
 								
 								scope[File.node.nodeName] = x;
 								push("iMEGADownloadWrite", File.node);
+							},
+							seek : function(p) {
+								push("iMEGADownloadSeek", File.node, p);
 							}
 						};
 						
@@ -81,7 +89,6 @@
 				scope.document.documentElement.appendChild(node);
 				
 				node.addEventListener('iMEGADownloadWriter', function(ev) {
-					File.Writer.position += scope[File.node.nodeName].size;
 					delete scope[File.node.nodeName];
 					File.Writer.readyState = File.Writer.DONE;
 					File.Writer.onwriteend();
