@@ -266,6 +266,17 @@ let i$ = {
 				node = undefined;
 			}, false);
 			
+			let kpkc = 0, kp = function(ev) {
+				switch(ev.keyCode) {
+					case window.KeyEvent.DOM_VK_SHIFT:
+					case window.KeyEvent.DOM_VK_CONTROL:
+						kpkc = ev.type == 'keyup' ? 0 : ev.keyCode;
+					default:break;
+				}
+			};
+			doc.addEventListener('keydown', kp, false);
+			doc.addEventListener('keyup'  , kp, false);
+			
 			try {
 				loadSubScript(rsc('inc/fileapi.js'),win);
 				LOG('FileSystem API Injected...');
@@ -288,7 +299,7 @@ let i$ = {
 						&& node.getAttribute('folder').split(/[\\\/]+/).filter(String);
 				f = f.replace(/[:\/\\<">|?*]+/g,'.').replace(/\s*\.+/g,'.').substr(0,256);
 				
-				if((last_path && fld) || (~f.indexOf('.') && addon.branch.getCharPref('dir'))) {
+				if((last_path && fld) || (!kpkc && ~f.indexOf('.') && addon.branch.getCharPref('dir'))) {
 					f = i$.nf(f,fld && last_path || addon.branch.getCharPref('dir'),fld);
 				} else {
 					let nsIFilePicker = Ci.nsIFilePicker,
@@ -396,21 +407,18 @@ let i$ = {
 						} else {
 							i$.sa('Download ' + fn + ' finished.');
 						}
-						node = fs = f = undefined;
+						node = fs = f = kpkc = kp = undefined;
 					}, false);
 					
 					node.addEventListener('iMEGADownloadSeek', function(ev) {
-						let pos = node.getAttribute('data');
+						// let pos = node.getAttribute('data');
 						// LOG('iMEGADownloadSeek: ' + pos);
-						fs.seek(0,pos);
+						fs.seek(0,node.getAttribute('data'));
 					}, false);
 					
 					node.addEventListener('iMEGADownloadWrite', function(ev) {
 						let blob = win.wrappedJSObject[node.nodeName];
 						// LOG('iMEGADownloadWrite: ' + (blob && blob.size));
-						
-						if(typeof blob !== 'object')
-							return;
 						
 						let fr = new window.FileReader();
 						fr.onload = function(ev) {

@@ -34,10 +34,8 @@
 	
 	scope.TEMPORARY = 0;
 	
-	let push = function(type, node, data) {
+	let push = function(type, node) {
 		let ev = scope.document.createEvent("Events");
-		if(data)
-			node.setAttribute('data', data);
 		ev.initEvent(type, true, false);
 		node.dispatchEvent(ev);
 	};
@@ -71,7 +69,8 @@
 								push("iMEGADownloadWrite", File.node);
 							},
 							seek : function(p) {
-								push("iMEGADownloadSeek", File.node, p);
+								File.node.setAttribute('data', p);
+								push("iMEGADownloadSeek", File.node);
 							}
 						};
 						

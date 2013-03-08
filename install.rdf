@@ -4,7 +4,7 @@
 		<em:id>{065ee92a-ad57-42a2-b6d5-466b6fd8e24d}</em:id>
 		<em:type>2</em:type>
 		<em:name>iMEGA</em:name>
-		<em:version>0.2.20</em:version>
+		<em:version>0.3.7</em:version>
 		<em:creator>Diego Casorran &lt;dcasorran@gmail.com&gt;</em:creator>
 		<em:description>This add-on is intended to ease the life of the regular MEGA user.</em:description>
 		<em:bootstrap>true</em:bootstrap>
@@ -13,7 +13,7 @@
 				<!-- Firefox -->
 				<em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
 				<em:minVersion>8.0a1</em:minVersion>
-				<em:maxVersion>21.0a1</em:maxVersion>
+				<em:maxVersion>22.0</em:maxVersion>
 			</Description>
 		</em:targetApplication>
 		<em:targetApplication>
@@ -21,7 +21,7 @@
 				<!-- SeaMonkey -->
 				<em:id>{92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}</em:id>
 				<em:minVersion>2.3</em:minVersion>
-				<em:maxVersion>2.16a1</em:maxVersion>
+				<em:maxVersion>2.19</em:maxVersion>
 			</Description>
 		</em:targetApplication>
 	</Description>
