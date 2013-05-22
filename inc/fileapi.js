@@ -63,10 +63,12 @@
 							position : 0,
 							write : function(x) {
 								this.readyState = this.WRITING;
-								this.position = this.writepos+x.size;
+								this.position = this.targetpos;
 								
 								scope[File.node.nodeName] = x;
 								push("iMEGADownloadWrite", File.node);
+							},
+							truncate : function(p) {
 							},
 							seek : function(p) {
 								File.node.setAttribute('data', p);
@@ -79,7 +81,7 @@
 				};
 				
 				let node = scope.document.createElement("iMEGADownload" + File.name.replace('/',':','g'));
-				node.setAttribute("filename", scope.dl_filename);
+				node.setAttribute("filename", scope.dl_zip && scope.dl_zip.name || scope.dl_filename);
 				node.setAttribute("filesize", scope.dl_filesize);
 				try {
 					if(scope.dl_queue[scope.dl_queue_num].p)
