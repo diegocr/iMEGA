@@ -223,7 +223,7 @@ let i$ = {
 		getBrowser(window).addEventListener('DOMContentLoaded',window['$'+addon.id.replace(/[^\d]/g,'')] = (function(ev) {
 			let doc = ev.originalTarget;
 			
-			if(!(doc.location && doc.location.host == 'mega.co.nz'))
+			if(!(doc.location && doc.location.host === 'mega.co.nz' && doc.location.protocol === 'https:'))
 				return;
 			
 			let win = doc.defaultView;
@@ -390,13 +390,7 @@ let i$ = {
 							dlc = addon.branch.getIntPref('dlc');
 							addon.branch.setIntPref('dlc', ++dlc);
 						}
-						if(!(dlc % 50)) {
-							let b = getBrowser(i$.Window);
-							b.selectedTab = b.addTab('http://goo.gl/Q6ZiF');
-							P("Your download has finished.\n\n"
-								+ "Would you be so kind to support iMEGA with a small contribution? "
-								+ "That way you'll encourage further development. Thank you.");
-						} else if(!f) {
+						if(!f) {
 							i$.sa(fn,'Download Finished.',function(s,t) {
 								if(t !== 'alertfinished') try {
 									let dlui = Components.classesByID["{7dfdf0d1-aff6-4a34-bad1-d0fe74601642}"]
