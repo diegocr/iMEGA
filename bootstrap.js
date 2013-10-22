@@ -392,7 +392,7 @@ let i$ = {
 						}
 						if(!f) {
 							i$.sa(fn,'Download Finished.',function(s,t) {
-								if(t !== 'alertfinished') try {
+								if(t == 'alertclickcallback') try {
 									let dlui = Components.classesByID["{7dfdf0d1-aff6-4a34-bad1-d0fe74601642}"]
 										.getService(Ci.nsIDownloadManagerUI);
 									dlui.show();
