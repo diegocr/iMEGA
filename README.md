@@ -12,3 +12,9 @@ Please note checking your credentials might take some time (due cryptographic pr
 Hence, if any entered credentials were correct, you'll be able to go to the MEGA site by clicking the toolbar button and thus without the need to manually entering your log-in details. Note however, this is mainly useful if you've Offline Storage disabled or set to clear up on shutdown, ie: about:config?filter=offlineApps
 
 Downloads support introduced in version 0.2.1 is based in a minimalist File API implementation... that is, it essentially provides just what the site needs to be able to save files from Javascript. On the Add-Ons Manager you can configure where downloads will be saved by default. If you don't specify any folder - or the download filename lacks an extension - you'll be asked before the download starts.
+
+---
+
+AMO listing page: <https://addons.mozilla.org/addon/imega/>
+
+_If you want to help testing by installing iMEGA straight from this repo try this extension:_ <https://addons.mozilla.org/addon/GitHub-Extension-Installer/>
