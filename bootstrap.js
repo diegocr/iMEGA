@@ -26,8 +26,10 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function rsc(n) 'resource://' + addon.tag + '/' + n;
 function LOG_(m) (m = addon.name + ' Message @ '
-	+ (new Date()).toISOString() + "\n> " + m,
-		dump(m + "\n"), Services.console.logStringMessage(m));
+	+ (new Date()).toISOString() + "\n> " + m
+	+ "\n\n" + new Error().stack.split("\n").map(
+	function(s)s.replace(/^(.*@).+\//,'$1')).join("\n"),
+	dump(m + "\n"), Services.console.logStringMessage(m));
 
 function LOG(m) addon.branch.getBoolPref('debug') && LOG_(m);
 
@@ -95,7 +97,11 @@ let i$ = {
 			scope.alert = P.bind(scope);
 			scope.window = scope;
 			scope.navigator = window.navigator;
-			scope.crypto = Cc["@mozilla.org/security/crypto;1"].getService(Ci.nsIDOMCrypto);
+			try {
+				scope.crypto = Cc["@mozilla.org/security/crypto;1"].getService(Ci.nsIDOMCrypto);
+			} catch(e) {
+				scope.crypto = window.crypto;
+			}
 			// XXX: Erm.. somehow api_getsid2() takes 20s longer by using the Constructor way (!?)
 			scope.XMLHttpRequest = window.XMLHttpRequest;
 			// scope.XMLHttpRequest = Components.Constructor("@mozilla.org/xmlextras/xmlhttprequest;1");
@@ -120,7 +126,7 @@ let i$ = {
 				// fmconfig: '{"blockchromeDialog":"1"}'
 			};
 		} catch(ex) {
-			LOG(ex);
+			Cu.reportError(ex);
 		}
 		window = undefined;
 	},
