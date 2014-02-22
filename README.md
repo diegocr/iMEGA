@@ -18,3 +18,7 @@ Downloads support introduced in version 0.2.1 is based in a minimalist File API 
 AMO listing page: <https://addons.mozilla.org/addon/imega/>
 
 _If you want to help testing by installing iMEGA straight from this repo try this extension:_ <https://addons.mozilla.org/addon/GitHub-Extension-Installer/>
+
+---
+
+_As of 2014 this extension is discontinued, please use the official MEGA extension instead._
